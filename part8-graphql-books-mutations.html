@@ -1,1 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+</head>
+<body>
+  <div id="app"></div>
 
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    let books = [
+      { title: "Clean Code", author: "Robert Martin", published: 2008 },
+      { title: "Agile software development", author: "Robert Martin", published: 2002 },
+      { title: "The Hobbit", author: "J.R.R. Tolkien", published: 1937 },
+    ];
+
+    const wait = (value) => new Promise((resolve) => setTimeout(() => resolve(value), 300));
+
+    const fakeGraphqlServer = async (query, variables) => {
+      if (query === "ALL_BOOKS") {
+        return wait({ allBooks: books });
+      }
+      if (query === "ADD_BOOK") {
+        const newBook = { ...variables };
+        books = [...books, newBook];
+        return wait({ addBook: newBook });
+      }
+      throw new Error("unknown query");
+    };
+
+    const useQuery = (query, variables) => {
+      const [data, setData] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [refetchFlag, setRefetchFlag] = useState(0);
+
+      useEffect(() => {
+        setLoading(true);
+        fakeGraphqlServer(query, variables).then((result) => {
+          setData(result);
+          setLoading(false);
+        });
+      }, [query, JSON.stringify(variables), refetchFlag]);
+
+      const refetch = () => setRefetchFlag((f) => f + 1);
+
+      return { data, loading, refetch };
+    };
+
+    const useMutation = (query) => {
+      const run = (variables) => fakeGraphqlServer(query, variables);
+      return [run];
+    };
+
+    const AddBookForm = ({ onAdded }) => {
+      const [title, setTitle] = useState("");
+      const [author, setAuthor] = useState("");
+      const [published, setPublished] = useState("");
+      const [addBook] = useMutation("ADD_BOOK");
+
+      const submit = async (e) => {
+        e.preventDefault();
+        await addBook({ title, author, published: Number(published) });
+        setTitle("");
+        setAuthor("");
+        setPublished("");
+        onAdded();
+      };
+
+      return (
+        <form onSubmit={submit}>
+          <div>
+            title <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div>
+            author <input value={author} onChange={(e) => setAuthor(e.target.value)} />
+          </div>
+          <div>
+            published{" "}
+            <input value={published} onChange={(e) => setPublished(e.target.value)} />
+          </div>
+          <button type="submit">add book</button>
+        </form>
+      );
+    };
+
+    const BookList = ({ books }) => (
+      <table>
+        <tbody>
+          <tr>
+            <th>title</th>
+            <th>author</th>
+            <th>published</th>
+          </tr>
+          {books.map((b) => (
+            <tr key={b.title}>
+              <td>{b.title}</td>
+              <td>{b.author}</td>
+              <td>{b.published}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+
+    const App = () => {
+      const { data, loading, refetch } = useQuery("ALL_BOOKS");
+
+      return (
+        <div>
+          <h2>GraphQL books</h2>
+          <h3>add a new book</h3>
+          <AddBookForm onAdded={refetch} />
+
+          <h3>books</h3>
+          {loading ? <div>loading...</div> : <BookList books={data.allBooks} />}
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById("app"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
