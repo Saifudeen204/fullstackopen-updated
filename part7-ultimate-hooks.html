@@ -1,1 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+</head>
+<body>
+  <div id="app"></div>
 
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const useField = (type) => {
+      const [value, setValue] = useState("");
+
+      const onChange = (event) => {
+        setValue(event.target.value);
+      };
+
+      const reset = () => setValue("");
+
+      return { type, value, onChange, reset };
+    };
+
+    const useResource = (baseUrl) => {
+      const [resources, setResources] = useState([]);
+
+      useEffect(() => {
+        fetch(baseUrl)
+          .then((res) => res.json())
+          .then((data) => setResources(data.slice(0, 5)));
+      }, [baseUrl]);
+
+      const create = async (resource) => {
+        const res = await fetch(baseUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(resource),
+        });
+        const created = await res.json();
+        setResources((prev) => [...prev, created]);
+      };
+
+      return [resources, create];
+    };
+
+    const App = () => {
+      const title = useField("text");
+      const body = useField("text");
+
+      const [notes, createNote] = useResource(
+        "https://jsonplaceholder.typicode.com/posts"
+      );
+
+      const handleSubmit = (event) => {
+        event.preventDefault();
+        createNote({ title: title.value, body: body.value });
+        title.reset();
+        body.reset();
+      };
+
+      return (
+        <div>
+          <h2>ultimate hooks</h2>
+
+          <form onSubmit={handleSubmit}>
+            <div>
+              title <input {...title} />
+            </div>
+            <div>
+              body <input {...body} />
+            </div>
+            <button>create</button>
+          </form>
+
+          <h3>notes</h3>
+          {notes.map((note) => (
+            <div key={note.id} style={{ marginBottom: 8 }}>
+              <strong>{note.title}</strong>
+              <div>{note.body}</div>
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById("app"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
