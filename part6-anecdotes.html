@@ -1,1 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+</head>
+<body>
+  <div id="app"></div>
 
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    function create(createState) {
+      let state;
+      const listeners = new Set();
+
+      const setState = (partial) => {
+        const next = typeof partial === "function" ? partial(state) : partial;
+        state = { ...state, ...next };
+        listeners.forEach((listener) => listener());
+      };
+
+      const getState = () => state;
+
+      const subscribe = (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      };
+
+      state = createState(setState, getState);
+
+      return function useStore(selector) {
+        const [, forceRender] = React.useReducer((c) => c + 1, 0);
+        React.useEffect(() => subscribe(() => forceRender()), []);
+        return selector(getState());
+      };
+    }
+
+    const initial = [
+      "If it hurts, do it more often.",
+      "Adding manpower to a late software project makes it later!",
+      "The first 90 percent of the code accounts for the first 90 percent of the development time...",
+      "Any fool can write code that a computer can understand. Good programmers write code that humans can understand.",
+      "Premature optimization is the root of all evil.",
+      "Debugging is twice as hard as writing the code in the first place.",
+    ].map((content, id) => ({ id, content, votes: 0 }));
+
+    let notifyTimer;
+
+    const useAnecdoteStore = create((set) => ({
+      anecdotes: initial,
+      notification: "",
+      actions: {
+        vote: (id) =>
+          set((state) => ({
+            anecdotes: state.anecdotes.map((a) =>
+              a.id === id ? { ...a, votes: a.votes + 1 } : a
+            ),
+          })),
+        add: (content) =>
+          set((state) => ({
+            anecdotes: [...state.anecdotes, { id: Date.now(), content, votes: 0 }],
+          })),
+        notify: (message) => {
+          set(() => ({ notification: message }));
+          clearTimeout(notifyTimer);
+          notifyTimer = setTimeout(() => set(() => ({ notification: "" })), 5000);
+        },
+      },
+    }));
+
+    const Notification = () => {
+      const notification = useAnecdoteStore((state) => state.notification);
+      if (!notification) return null;
+      return (
+        <div style={{ border: "1px solid green", padding: 10, margin: "10px 0" }}>
+          {notification}
+        </div>
+      );
+    };
+
+    const AnecdoteForm = () => {
+      const { add, notify } = useAnecdoteStore((state) => state.actions);
+      const [text, setText] = React.useState("");
+
+      const submit = () => {
+        const content = text.trim();
+        if (!content) return;
+        add(content);
+        notify(`you created '${content}'`);
+        setText("");
+      };
+
+      return (
+        <div>
+          <h2>create new</h2>
+          <input value={text} onChange={(e) => setText(e.target.value)} />
+          <button onClick={submit}>create</button>
+        </div>
+      );
+    };
+
+    const AnecdoteList = () => {
+      const anecdotes = useAnecdoteStore((state) => state.anecdotes);
+      const { vote, notify } = useAnecdoteStore((state) => state.actions);
+
+      const sorted = [...anecdotes].sort((a, b) => b.votes - a.votes);
+
+      const handleVote = (a) => {
+        vote(a.id);
+        notify(`you voted '${a.content}'`);
+      };
+
+      return (
+        <div>
+          {sorted.map((a) => (
+            <div key={a.id} style={{ marginBottom: 12 }}>
+              <div>{a.content}</div>
+              <div>
+                has {a.votes} votes{" "}
+                <button onClick={() => handleVote(a)}>vote</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    const App = () => (
+      <div>
+        <h2>Anecdotes</h2>
+        <Notification />
+        <AnecdoteList />
+        <AnecdoteForm />
+      </div>
+    );
+
+    const root = ReactDOM.createRoot(document.getElementById("app"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
