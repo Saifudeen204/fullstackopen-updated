@@ -1,1 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+</head>
+<body>
+  <div id="app"></div>
 
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const useCountry = (name) => {
+      const [country, setCountry] = useState(null);
+
+      useEffect(() => {
+        if (!name) {
+          setCountry(null);
+          return;
+        }
+
+        let cancelled = false;
+
+        fetch(`https://studies.cs.helsinki.fi/restcountries/api/all`)
+          .then((res) => res.json())
+          .then((all) => {
+            if (cancelled) return;
+            const match = all.find(
+              (c) => c.name.common.toLowerCase() === name.toLowerCase()
+            );
+            setCountry(match ? { found: true, data: match } : { found: false });
+          })
+          .catch(() => {
+            if (!cancelled) setCountry({ found: false });
+          });
+
+        return () => {
+          cancelled = true;
+        };
+      }, [name]);
+
+      return country;
+    };
+
+    const Country = ({ country }) => {
+      if (!country) return null;
+      if (!country.found) return <div>not found...</div>;
+
+      const data = country.data;
+      return (
+        <div>
+          <h3>{data.name.common}</h3>
+          <div>capital {data.capital?.[0]}</div>
+          <div>population {data.population}</div>
+          <img src={data.flags.png} height="100" alt={`flag of ${data.name.common}`} />
+        </div>
+      );
+    };
+
+    const App = () => {
+      const [name, setName] = useState("");
+      const [query, setQuery] = useState("");
+      const country = useCountry(query);
+
+      const search = () => setQuery(name.trim());
+
+      return (
+        <div>
+          <h2>country search</h2>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <button onClick={search}>find</button>
+          <Country country={country} />
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById("app"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
