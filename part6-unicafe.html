@@ -1,1 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+</head>
+<body>
+  <div id="app"></div>
 
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    // Minimal Zustand-style store, built from plain React.
+    function create(createState) {
+      let state;
+      const listeners = new Set();
+
+      const setState = (partial) => {
+        const next = typeof partial === "function" ? partial(state) : partial;
+        state = { ...state, ...next };
+        listeners.forEach((listener) => listener());
+      };
+
+      const getState = () => state;
+
+      const subscribe = (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      };
+
+      state = createState(setState, getState);
+
+      return function useStore(selector) {
+        const [, forceRender] = React.useReducer((c) => c + 1, 0);
+        React.useEffect(() => subscribe(() => forceRender()), []);
+        return selector(getState());
+      };
+    }
+
+    const useFeedbackStore = create((set) => ({
+      good: 0,
+      ok: 0,
+      bad: 0,
+      actions: {
+        good: () => set((state) => ({ good: state.good + 1 })),
+        ok: () => set((state) => ({ ok: state.ok + 1 })),
+        bad: () => set((state) => ({ bad: state.bad + 1 })),
+        zero: () => set(() => ({ good: 0, ok: 0, bad: 0 })),
+      }
+    }));
+
+    const Button = ({ onClick, text }) => (
+      <button onClick={onClick}>{text}</button>
+    );
+
+    const StatisticLine = ({ text, value }) => (
+      <tr>
+        <td>{text}</td>
+        <td>{value}</td>
+      </tr>
+    );
+
+    const Statistics = () => {
+      const good = useFeedbackStore((state) => state.good);
+      const ok = useFeedbackStore((state) => state.ok);
+      const bad = useFeedbackStore((state) => state.bad);
+
+      const total = good + ok + bad;
+      const average = total === 0 ? 0 : (good - bad) / total;
+      const positive = total === 0 ? 0 : (good / total) * 100;
+
+      if (total === 0) {
+        return <p>No feedback given</p>;
+      }
+
+      return (
+        <table>
+          <tbody>
+            <StatisticLine text="good" value={good} />
+            <StatisticLine text="ok" value={ok} />
+            <StatisticLine text="bad" value={bad} />
+            <StatisticLine text="all" value={total} />
+            <StatisticLine text="average" value={average.toFixed(1)} />
+            <StatisticLine text="positive" value={positive.toFixed(1) + ' %'} />
+          </tbody>
+        </table>
+      );
+    };
+
+    const App = () => {
+      const { good, ok, bad, zero } = useFeedbackStore((state) => state.actions);
+
+      return (
+        <div>
+          <h2>give feedback</h2>
+          <Button onClick={good} text="good" />
+          <Button onClick={ok} text="ok" />
+          <Button onClick={bad} text="bad" />
+          <Button onClick={zero} text="reset" />
+
+          <h2>statistics</h2>
+          <Statistics />
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById("app"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
