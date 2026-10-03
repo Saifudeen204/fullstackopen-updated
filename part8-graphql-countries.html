@@ -1,1 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+</head>
+<body>
+  <div id="app"></div>
 
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const GRAPHQL_URL = "https://countries.trevorblades.com/graphql";
+
+    const graphqlRequest = async (query, variables) => {
+      const res = await fetch(GRAPHQL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, variables }),
+      });
+      const json = await res.json();
+      return json.data;
+    };
+
+    const useQuery = (query, variables) => {
+      const [data, setData] = useState(null);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        setLoading(true);
+        graphqlRequest(query, variables).then((result) => {
+          setData(result);
+          setLoading(false);
+        });
+      }, [query, JSON.stringify(variables)]);
+
+      return { data, loading };
+    };
+
+    const ALL_COUNTRIES = `
+      query {
+        countries {
+          code
+          name
+          emoji
+        }
+      }
+    `;
+
+    const COUNTRY_DETAILS = `
+      query CountryDetails($code: ID!) {
+        country(code: $code) {
+          name
+          emoji
+          capital
+          currency
+          languages {
+            name
+          }
+        }
+      }
+    `;
+
+    const CountryDetails = ({ code }) => {
+      const { data, loading } = useQuery(COUNTRY_DETAILS, { code });
+
+      if (loading) return <div>loading...</div>;
+      if (!data || !data.country) return null;
+
+      const c = data.country;
+      return (
+        <div style={{ border: "1px solid #ccc", padding: 10, marginTop: 10 }}>
+          <h3>{c.emoji} {c.name}</h3>
+          <div>capital: {c.capital}</div>
+          <div>currency: {c.currency}</div>
+          <div>
+            languages: {c.languages.map((l) => l.name).join(", ")}
+          </div>
+        </div>
+      );
+    };
+
+    const App = () => {
+      const { data, loading } = useQuery(ALL_COUNTRIES);
+      const [selected, setSelected] = useState(null);
+
+      if (loading) return <div>loading countries...</div>;
+
+      return (
+        <div>
+          <h2>GraphQL countries</h2>
+          <select onChange={(e) => setSelected(e.target.value)}>
+            <option value="">-- choose a country --</option>
+            {data.countries.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.emoji} {c.name}
+              </option>
+            ))}
+          </select>
+
+          {selected && <CountryDetails code={selected} />}
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById("app"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
